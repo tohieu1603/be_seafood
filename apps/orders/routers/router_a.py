@@ -6,6 +6,7 @@ from ninja import Router, File, UploadedFile, Form, Query
 from apps.orders.schemas.input_schema import (
     CreateOrderSchema,
     UpdateOrderStatusSchema,
+    UpdateAssignedUsersSchema,
     UploadOrderImageSchema,
     OrderFilterSchema
 )
@@ -155,8 +156,26 @@ def upload_order_image(
         }
     except ValueError as e:
         return 400, {"detail": str(e)}
+
+
+@orders_router.patch("/{order_id}/assigned-users", response={200: OrderDetailSchema, 400: ErrorResponse, 403: ErrorResponse})
+def update_assigned_users(request, order_id: int, payload: UpdateAssignedUsersSchema):
+    """Update assigned users for an order."""
+    try:
+        from core.enums.base_enum import UserRole
+
+        user = request.auth
+
+        # Only admin and manager can reassign
+        if user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
+            return 403, {"detail": "Chỉ Admin và Manager mới có quyền phân công lại nhân viên"}
+
+        order = order_service.update_assigned_users(order_id, payload.assigned_to_ids, user)
+        return 200, order
+    except ValueError as e:
+        return 400, {"detail": str(e)}
     except Exception as e:
-        return 400, {"detail": f"Error uploading image: {str(e)}"}
+        return 400, {"detail": f"Error updating assigned users: {str(e)}"}
 
 
 @orders_router.get("/statistics/summary", response=dict)

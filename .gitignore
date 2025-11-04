@@ -49,7 +49,9 @@ ENV/
 logs/
 
 # Media files (uploaded images, etc.)
-media/
+# Ignore all files in media/ but keep the directory structure
+media/*
+!media/.gitkeep
 uploads/
 
 # Testing

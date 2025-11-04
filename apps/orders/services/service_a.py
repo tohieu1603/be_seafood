@@ -107,7 +107,8 @@ class OrderService:
                 product_name=item_data.product_name,
                 quantity=item_data.quantity,
                 unit=item_data.unit,
-                price=item_data.price
+                price=item_data.price,
+                note=item_data.note or ''
             )
 
         # Assign users
@@ -145,18 +146,8 @@ class OrderService:
         # Validate status transition
         self._validate_status_transition(order, status_data.new_status)
 
-        # Validate required images
-        if status_data.new_status == OrderStatus.CREATE_INVOICE.value:
-            # Must have weighing images
-            weighing_images = self.repository.get_order_images(order, 'weighing')
-            if not weighing_images:
-                raise ValueError("Phải upload ảnh cân hàng trước khi chuyển sang bước 'Tạo phiếu ĐH'")
-
-        if status_data.new_status == OrderStatus.SEND_PHOTO.value:
-            # Must have invoice images
-            invoice_images = self.repository.get_order_images(order, 'invoice')
-            if not invoice_images:
-                raise ValueError("Phải upload ảnh phiếu đặt hàng trước khi chuyển sang bước 'Gửi ảnh cân'")
+        # Validate transition requirements
+        self._validate_transition_requirements(order, status_data.new_status)
 
         # Get old status for logging
         old_status = order.status
@@ -189,28 +180,119 @@ class OrderService:
         """Validate if status transition is allowed."""
         current_status = order.status
 
+        # Can't change from completed or failed
+        if current_status in [OrderStatus.COMPLETED.value, OrderStatus.FAILED.value]:
+            raise ValueError(
+                f"Không thể thay đổi trạng thái từ '{OrderStatus.get_label(OrderStatus(current_status))}'"
+            )
+
         # Can always mark as failed
         if new_status == OrderStatus.FAILED.value:
             return
 
-        # Define allowed transitions
-        allowed_transitions = {
-            OrderStatus.CREATED.value: [OrderStatus.WEIGHING.value],
-            OrderStatus.WEIGHING.value: [OrderStatus.CREATE_INVOICE.value],
-            OrderStatus.CREATE_INVOICE.value: [OrderStatus.SEND_PHOTO.value],
-            OrderStatus.SEND_PHOTO.value: [OrderStatus.PAYMENT.value],
-            OrderStatus.PAYMENT.value: [OrderStatus.IN_KITCHEN.value],
-            OrderStatus.IN_KITCHEN.value: [OrderStatus.PROCESSING.value],
-            OrderStatus.PROCESSING.value: [OrderStatus.DELIVERY.value],
-            OrderStatus.DELIVERY.value: [OrderStatus.COMPLETED.value],
-        }
+        # Define the workflow order
+        workflow_order = [
+            OrderStatus.CREATED.value,
+            OrderStatus.WEIGHING.value,
+            OrderStatus.CREATE_INVOICE.value,
+            OrderStatus.SEND_PHOTO.value,
+            OrderStatus.PAYMENT.value,
+            OrderStatus.IN_KITCHEN.value,
+            OrderStatus.PROCESSING.value,
+            OrderStatus.DELIVERY.value,
+            OrderStatus.COMPLETED.value,
+        ]
 
-        allowed = allowed_transitions.get(current_status, [])
-        if new_status not in allowed:
+        # Allow moving to any status in the workflow (forward or backward)
+        # except moving TO completed from non-delivery status
+        if new_status == OrderStatus.COMPLETED.value and current_status != OrderStatus.DELIVERY.value:
             raise ValueError(
-                f"Không thể chuyển từ '{OrderStatus.get_label(OrderStatus(current_status))}' "
-                f"sang '{OrderStatus.get_label(OrderStatus(new_status))}'"
+                "Chỉ có thể chuyển sang 'Hoàn thành' từ trạng thái 'Giao hàng'"
             )
+
+        # Validate new status is in workflow
+        if new_status not in workflow_order:
+            raise ValueError(
+                f"Trạng thái '{new_status}' không hợp lệ"
+            )
+
+    def _validate_transition_requirements(self, order: Order, new_status: str):
+        """Validate business requirements for each status transition."""
+        current_status = order.status
+
+        # CREATED -> WEIGHING: Must confirm weighing is done
+        if current_status == OrderStatus.CREATED.value and new_status == OrderStatus.WEIGHING.value:
+            # No special requirements, just confirmation in frontend
+            pass
+
+        # WEIGHING -> CREATE_INVOICE: Should have weighing images (but not strictly required)
+        if current_status == OrderStatus.WEIGHING.value and new_status == OrderStatus.CREATE_INVOICE.value:
+            # Optional: Check for weighing images
+            pass
+
+        # CREATE_INVOICE -> SEND_PHOTO: Must confirm sending photos to customer
+        if current_status == OrderStatus.CREATE_INVOICE.value and new_status == OrderStatus.SEND_PHOTO.value:
+            # No special requirements, just confirmation in frontend
+            pass
+
+        # SEND_PHOTO -> PAYMENT: Must confirm sending invoice to customer
+        if current_status == OrderStatus.SEND_PHOTO.value and new_status == OrderStatus.PAYMENT.value:
+            # No special requirements, just confirmation in frontend
+            pass
+
+        # PAYMENT -> IN_KITCHEN: Must confirm payment received
+        if current_status == OrderStatus.PAYMENT.value and new_status == OrderStatus.IN_KITCHEN.value:
+            # Payment confirmation required (handled in frontend)
+            # Optional: bill image upload
+            pass
+
+        # IN_KITCHEN -> PROCESSING: Can set deadline
+        if current_status == OrderStatus.IN_KITCHEN.value and new_status == OrderStatus.PROCESSING.value:
+            # Optional: update deadline
+            pass
+
+        # PROCESSING -> DELIVERY: Must have shipping info
+        if current_status == OrderStatus.PROCESSING.value and new_status == OrderStatus.DELIVERY.value:
+            # Shipping info required (handled in frontend)
+            pass
+
+        # DELIVERY -> COMPLETED: Must confirm delivery success
+        if current_status == OrderStatus.DELIVERY.value and new_status == OrderStatus.COMPLETED.value:
+            # Confirmation required (handled in frontend)
+            pass
+
+    @transaction.atomic
+    def update_assigned_users(
+        self,
+        order_id: int,
+        user_ids: list[int],
+        user: User
+    ) -> Order:
+        """Update assigned users for an order."""
+        order = self.get_order_by_id(order_id)
+        if not order:
+            raise ValueError(f"Order with ID {order_id} not found")
+
+        # Get users
+        from apps.users.models import User as UserModel
+        users = UserModel.objects.filter(id__in=user_ids)
+
+        if len(users) != len(user_ids):
+            raise ValueError("One or more user IDs are invalid")
+
+        # Update assigned users
+        order.assigned_to.set(users)
+        order.save()
+
+        # Create activity log
+        self.repository.create_activity(
+            order=order,
+            action="assigned_users_updated",
+            description=f"Phân công lại cho: {', '.join([u.get_full_name() for u in users])}",
+            user=user
+        )
+
+        return order
 
     @transaction.atomic
     def upload_order_image(

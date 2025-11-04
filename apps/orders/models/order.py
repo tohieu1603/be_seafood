@@ -205,6 +205,11 @@ class OrderItem(BaseModel):
         decimal_places=0,
         verbose_name='Thành tiền'
     )
+    note = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Ghi chú món'
+    )
 
     class Meta:
         db_table = 'order_items'

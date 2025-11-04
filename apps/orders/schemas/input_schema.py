@@ -14,6 +14,7 @@ class ProductItemInput(BaseModel):
     quantity: Decimal = Field(gt=0)
     unit: str
     price: Decimal = Field(ge=0)
+    note: Optional[str] = Field(default='', max_length=500)
 
 
 class CreateOrderSchema(BaseModel):
@@ -65,6 +66,12 @@ class UpdateOrderStatusSchema(BaseModel):
         if values.get('new_status') == 'failed' and not v:
             raise ValueError('Phải nhập lý do khi đánh dấu thất bại')
         return v
+
+
+class UpdateAssignedUsersSchema(BaseModel):
+    """Schema for updating assigned users."""
+
+    assigned_to_ids: List[int] = Field(..., min_items=1)
 
 
 class UploadOrderImageSchema(BaseModel):

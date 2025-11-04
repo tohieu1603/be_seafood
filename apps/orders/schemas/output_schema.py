@@ -43,6 +43,7 @@ class OrderItemSchema(Schema):
     unit: str
     price: Decimal
     total: Decimal
+    note: str
 
 
 class OrderImageSchema(Schema):
