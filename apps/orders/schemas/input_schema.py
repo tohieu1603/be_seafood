@@ -20,6 +20,9 @@ class ProductItemInput(BaseModel):
 class CreateOrderSchema(BaseModel):
     """Schema for creating an order - nhân viên nội bộ tạo đơn."""
 
+    # Tên đơn hàng (user input, REQUIRED)
+    order_name: str = Field(..., min_length=1, max_length=255, description="Tên đơn hàng (có thể trùng)")
+
     # Thông tin khách đặt hàng (nhập trực tiếp)
     customer_name: str = Field(min_length=1, max_length=255)
     customer_phone: str = Field(min_length=10, max_length=15)
@@ -32,8 +35,8 @@ class CreateOrderSchema(BaseModel):
     shipping_fee: Decimal = Field(default=0, ge=0)
     chip_fee: Decimal = Field(default=0, ge=0)
 
-    # Thời gian giao hàng
-    delivery_time: Optional[datetime] = None
+    # Thời gian giao hàng (REQUIRED for display)
+    delivery_time: datetime = Field(..., description="Thời gian giao hàng (bắt buộc)")
 
     # Phân công nhân viên
     assigned_to_ids: List[int] = Field(default_factory=list)
@@ -86,7 +89,7 @@ class OrderFilterSchema(Schema):
     status: Optional[str] = Field(None, description="Filter by order status")
     customer_id: Optional[int] = Field(None, description="Filter by customer ID")
     assigned_to_me: bool = Field(False, description="Show only orders assigned to me")
-    search: Optional[str] = Field(None, description="Search by order_number, customer name, phone")
+    search: Optional[str] = Field(None, description="Search by order_name, order_number, customer name, phone")
     date_from: Optional[datetime] = Field(None, description="Filter orders from this date")
     date_to: Optional[datetime] = Field(None, description="Filter orders to this date")
     page: int = Field(1, ge=1, description="Page number")

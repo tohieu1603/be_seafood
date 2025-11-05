@@ -84,13 +84,14 @@ class OrderService:
 
         # Create order với thông tin khách hàng nhập trực tiếp
         order = Order.objects.create(
+            order_name=order_data.order_name,  # User-provided name
             customer_name=order_data.customer_name,
             customer_phone=order_data.customer_phone,
             customer_address=order_data.customer_address,
             status=OrderStatus.CREATED.value,
             status_changed_at=timezone.now(),
             deadline=deadline,
-            delivery_time=order_data.delivery_time,
+            delivery_time=order_data.delivery_time,  # Now required
             subtotal=subtotal,
             shipping_fee=order_data.shipping_fee,
             chip_fee=order_data.chip_fee,

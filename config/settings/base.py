@@ -3,9 +3,21 @@ Django base settings for Seafood Order Management System.
 """
 from pathlib import Path
 from decouple import config
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+def _env_bool(key: str, default: str = "False") -> bool:
+    val = os.getenv(key, str(default))
+    return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def env_list(key: str, default: str = "") -> list[str]:
+    raw = os.getenv(key, default)
+    return [x.strip() for x in str(raw).split(",") if x and x.strip()]
 
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
@@ -140,6 +152,9 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:3000,http://127.0.0.1:3000'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
-
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'

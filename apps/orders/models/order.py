@@ -8,44 +8,55 @@ from apps.users.models import User
 
 
 def generate_order_number():
-    """Generate unique order number with format: DHYYYYMMDDxxxx (random 4 digits)."""
+    """
+    Generate sequential order number for the day.
+    Format: Đơn X (where X resets daily)
+    Example: Ngày 19: Đơn 1, Đơn 2, Đơn 3
+             Ngày 20: Đơn 1, Đơn 2, Đơn 3 (reset)
+    """
     from datetime import datetime
-    import random
-    now = datetime.now()
-    prefix = f"DH{now.strftime('%Y%m%d')}"  # Changed to full year YYYY
+    from django.db.models import Max
+    import re
 
-    # Generate random 4-digit number
-    max_attempts = 10
-    for _ in range(max_attempts):
-        random_suffix = f"{random.randint(0, 9999):04d}"
-        order_number = f"{prefix}{random_suffix}"
+    today = datetime.now().date()
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
 
-        # Check if this number already exists
-        if not Order.objects.filter(order_number=order_number).exists():
-            return order_number
+    # Get all orders created today
+    today_orders = Order.objects.filter(
+        created_at__gte=today_start,
+        created_at__lte=today_end
+    )
 
-    # If all random attempts failed, fall back to sequential
-    last_order = Order.objects.filter(
-        order_number__startswith=prefix
-    ).order_by('-order_number').first()
+    # Extract numbers from order_number (e.g., "Đơn 1" -> 1)
+    max_num = 0
+    for order in today_orders:
+        match = re.search(r'Đơn\s*(\d+)', order.order_number)
+        if match:
+            num = int(match.group(1))
+            if num > max_num:
+                max_num = num
 
-    if last_order:
-        last_seq = int(last_order.order_number[-4:])
-        seq = (last_seq + 1) % 10000  # Wrap around at 9999
-    else:
-        seq = 1
-
-    return f"{prefix}{seq:04d}"
+    next_num = max_num + 1
+    return f"Đơn {next_num}"
 
 
 class Order(BaseModel):
     """Order model - chỉ có nhân viên nội bộ tạo và xử lý."""
 
+    # Order numbering (auto-generated, resets daily)
     order_number = models.CharField(
         max_length=50,
-        unique=True,
         default=generate_order_number,
-        verbose_name='Số đơn hàng'
+        verbose_name='Số đơn hàng (tự động theo ngày)',
+        help_text='VD: Đơn 1, Đơn 2, Đơn 3 (reset mỗi ngày)'
+    )
+
+    # Order name (user input, can be duplicate)
+    order_name = models.CharField(
+        max_length=255,
+        verbose_name='Tên đơn hàng',
+        help_text='Tên đơn hàng tự đặt (có thể trùng)'
     )
 
     # Customer info (thông tin khách đặt hàng - nhập trực tiếp)
@@ -136,12 +147,22 @@ class Order(BaseModel):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['order_number']),
+            models.Index(fields=['order_name']),  # For search
             models.Index(fields=['status']),
             models.Index(fields=['-created_at']),
+            models.Index(fields=['delivery_time']),  # For display
         ]
 
     def __str__(self):
-        return f"{self.order_number} - {self.customer_name}"
+        """Display: OrderName - DeliveryTime (e.g., Đơn1 - 17:00)"""
+        if self.delivery_time:
+            time_str = self.delivery_time.strftime('%H:%M')
+            return f"{self.order_name} - {time_str}"
+        return f"{self.order_name} - Chưa có giờ giao"
+
+    def get_display_name(self):
+        """Get display name for order: OrderName - DeliveryTime"""
+        return str(self)
 
     def calculate_total(self):
         """Calculate total amount."""

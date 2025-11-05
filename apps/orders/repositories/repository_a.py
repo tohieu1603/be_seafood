@@ -34,6 +34,7 @@ class OrderRepository:
 
         if filters.search:
             queryset = queryset.filter(
+                Q(order_name__icontains=filters.search) |
                 Q(order_number__icontains=filters.search) |
                 Q(customer_name__icontains=filters.search) |
                 Q(customer_phone__icontains=filters.search)
