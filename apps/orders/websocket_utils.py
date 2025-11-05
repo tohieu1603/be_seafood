@@ -3,18 +3,31 @@ WebSocket utility functions for broadcasting order events.
 """
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def broadcast_order_created(order_data):
     """Broadcast order_created event to all connected clients."""
+    logger.info(f"🔔 Broadcasting order_created for order #{order_data.get('order_number', 'unknown')}")
+
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        'order_updates',
-        {
-            'type': 'order_created',
-            'order': order_data
-        }
-    )
+    if channel_layer is None:
+        logger.error("❌ Channel layer is None! WebSocket will not work.")
+        return
+
+    try:
+        async_to_sync(channel_layer.group_send)(
+            'order_updates',
+            {
+                'type': 'order_created',
+                'order': order_data
+            }
+        )
+        logger.info(f"✅ Broadcasted order_created successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to broadcast order_created: {e}")
 
 
 def broadcast_order_updated(order_data):

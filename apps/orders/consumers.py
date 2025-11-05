@@ -53,6 +53,10 @@ class OrderConsumer(AsyncWebsocketConsumer):
     # Handler for order_created event
     async def order_created(self, event):
         """Send order_created event to WebSocket."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"📤 Sending order_created to WebSocket client: {event['order'].get('order_number', 'unknown')}")
+
         await self.send(text_data=json.dumps({
             'type': 'order_created',
             'order': event['order']

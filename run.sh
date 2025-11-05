@@ -24,7 +24,8 @@ echo "Running migrations..."
 python manage.py makemigrations
 python manage.py migrate
 
-# Start server
-echo "Starting Django server at http://localhost:8000"
+# Start server with Daphne (for WebSocket support)
+echo "Starting Django server with Daphne (WebSocket support) at http://localhost:8000"
 echo "API Docs: http://localhost:8000/api/docs"
-python manage.py runserver
+echo "WebSocket: ws://localhost:8000/ws/orders/"
+daphne -b 0.0.0.0 -p 8000 config.asgi:application

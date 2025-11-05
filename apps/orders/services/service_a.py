@@ -148,8 +148,93 @@ class OrderService:
 
         # Broadcast order created event
         from apps.orders.schemas.output_schema import OrderDetailSchema
-        order_data = OrderDetailSchema.from_orm(order).dict()
+        order_data = OrderDetailSchema.from_orm(order).model_dump(mode='json')
         broadcast_order_created(order_data)
+
+        return order
+
+    @transaction.atomic
+    def update_order(
+        self,
+        order_id: int,
+        order_data,
+        user: User
+    ) -> Order:
+        """Update order details (items, customer info, fees, etc.)."""
+        from apps.orders.schemas.input_schema import UpdateOrderSchema
+
+        order = self.get_order_by_id(order_id)
+        if not order:
+            raise ValueError(f"Order with ID {order_id} not found")
+
+        # Update basic fields if provided
+        if order_data.order_name is not None:
+            order.order_name = order_data.order_name
+        if order_data.customer_name is not None:
+            order.customer_name = order_data.customer_name
+        if order_data.customer_phone is not None:
+            order.customer_phone = order_data.customer_phone
+        if order_data.customer_address is not None:
+            order.customer_address = order_data.customer_address
+        if order_data.shipping_fee is not None:
+            order.shipping_fee = order_data.shipping_fee
+        if order_data.chip_fee is not None:
+            order.chip_fee = order_data.chip_fee
+        if order_data.delivery_time is not None:
+            order.delivery_time = order_data.delivery_time
+        if order_data.notes is not None:
+            order.notes = order_data.notes
+
+        # Update items if provided
+        if order_data.items is not None:
+            # Delete existing items
+            order.items.all().delete()
+
+            # Create new items
+            for item_data in order_data.items:
+                product = None
+                if item_data.product_id:
+                    try:
+                        product = Product.objects.get(id=item_data.product_id)
+                    except Product.DoesNotExist:
+                        raise ValueError(f"Product with ID {item_data.product_id} not found")
+
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    product_name=item_data.product_name,
+                    quantity=item_data.quantity,
+                    unit=item_data.unit,
+                    price=item_data.price,
+                    note=item_data.note or ''
+                )
+
+        # Recalculate totals
+        subtotal = sum(item.total for item in order.items.all())
+        order.subtotal = subtotal
+        order.total = subtotal + order.shipping_fee + order.chip_fee
+        order.save()
+
+        # Update assigned users if provided
+        if order_data.assigned_to_ids is not None:
+            assigned_users = User.objects.filter(id__in=order_data.assigned_to_ids)
+            order.assigned_to.set(assigned_users)
+
+        # Log activity
+        self._log_activity(
+            order=order,
+            user=user,
+            activity_type='updated',
+            description=f"Cập nhật đơn hàng #{order.order_number}",
+            metadata={
+                'updated_by': user.get_full_name()
+            }
+        )
+
+        # Broadcast order updated event
+        from apps.orders.schemas.output_schema import OrderDetailSchema
+        order_data_dict = OrderDetailSchema.from_orm(order).model_dump(mode='json')
+        broadcast_order_updated(order_data_dict)
 
         return order
 

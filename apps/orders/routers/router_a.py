@@ -5,6 +5,7 @@ from ninja import Router, File, UploadedFile, Form, Query
 
 from apps.orders.schemas.input_schema import (
     CreateOrderSchema,
+    UpdateOrderSchema,
     UpdateOrderStatusSchema,
     UpdateAssignedUsersSchema,
     UploadOrderImageSchema,
@@ -102,6 +103,26 @@ def get_order(request, order_id: int):
     if not order:
         return 404, {"detail": f"Order with ID {order_id} not found"}
     return 200, order
+
+
+@orders_router.patch("/{order_id}", response={200: OrderDetailSchema, 400: ErrorResponse, 403: ErrorResponse})
+def update_order(request, order_id: int, payload: UpdateOrderSchema):
+    """Update order details (items, customer info, fees, etc.)."""
+    try:
+        from core.enums.base_enum import UserRole
+
+        user = request.auth
+
+        # Only admin, manager, and sale can edit orders
+        if user.role not in [UserRole.ADMIN.value, UserRole.MANAGER.value, UserRole.SALE.value]:
+            return 403, {"detail": "Chỉ Admin, Manager và Sale mới có quyền sửa đơn hàng"}
+
+        order = order_service.update_order(order_id, payload, user)
+        return 200, order
+    except ValueError as e:
+        return 400, {"detail": str(e)}
+    except Exception as e:
+        return 400, {"detail": f"Error updating order: {str(e)}"}
 
 
 @orders_router.patch("/{order_id}/status", response={200: OrderDetailSchema, 400: ErrorResponse, 403: ErrorResponse})

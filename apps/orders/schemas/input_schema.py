@@ -58,6 +58,48 @@ class CreateOrderSchema(BaseModel):
         return v
 
 
+class UpdateOrderSchema(BaseModel):
+    """Schema for updating an order - all fields optional."""
+
+    # Tên đơn hàng
+    order_name: Optional[str] = Field(None, min_length=1, max_length=255)
+
+    # Thông tin khách đặt hàng
+    customer_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_phone: Optional[str] = Field(None, min_length=10, max_length=15)
+    customer_address: Optional[str] = Field(None, min_length=1)
+
+    # Sản phẩm
+    items: Optional[List[ProductItemInput]] = Field(None, min_items=1)
+
+    # Phí
+    shipping_fee: Optional[Decimal] = Field(None, ge=0)
+    chip_fee: Optional[Decimal] = Field(None, ge=0)
+
+    # Thời gian giao hàng
+    delivery_time: Optional[datetime] = None
+
+    # Phân công nhân viên
+    assigned_to_ids: Optional[List[int]] = None
+
+    # Ghi chú
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @validator('items')
+    def validate_items(cls, v):
+        if v is not None and len(v) == 0:
+            raise ValueError('Đơn hàng phải có ít nhất 1 sản phẩm')
+        return v
+
+    @validator('customer_phone')
+    def validate_phone(cls, v):
+        if v is not None:
+            import re
+            if not re.match(r'^(0|\+84)[1-9][0-9]{8,9}$', v):
+                raise ValueError('Số điện thoại không hợp lệ')
+        return v
+
+
 class UpdateOrderStatusSchema(BaseModel):
     """Schema for updating order status."""
 
