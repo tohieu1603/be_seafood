@@ -69,40 +69,55 @@ def broadcast_order_status_changed(order_id, old_status, new_status, order_data)
     )
 
 
-def broadcast_order_image_uploaded(order_id, image_data):
+def broadcast_order_image_uploaded(order_id, image_data, order_data=None):
     """Broadcast order_image_uploaded event to all connected clients."""
     channel_layer = get_channel_layer()
+    payload = {
+        'type': 'order_image_uploaded',
+        'order_id': str(order_id),
+        'image': image_data
+    }
+    # Include full order data for realtime update
+    if order_data:
+        payload['order'] = order_data
+
     async_to_sync(channel_layer.group_send)(
         'order_updates',
-        {
-            'type': 'order_image_uploaded',
-            'order_id': str(order_id),
-            'image': image_data
-        }
+        payload
     )
 
 
-def broadcast_order_image_deleted(order_id, image_id):
+def broadcast_order_image_deleted(order_id, image_id, order_data=None):
     """Broadcast order_image_deleted event to all connected clients."""
     channel_layer = get_channel_layer()
+    payload = {
+        'type': 'order_image_deleted',
+        'order_id': str(order_id),
+        'image_id': str(image_id)
+    }
+    # Include full order data for realtime update
+    if order_data:
+        payload['order'] = order_data
+
     async_to_sync(channel_layer.group_send)(
         'order_updates',
-        {
-            'type': 'order_image_deleted',
-            'order_id': str(order_id),
-            'image_id': str(image_id)
-        }
+        payload
     )
 
 
-def broadcast_order_assigned(order_id, assigned_users):
+def broadcast_order_assigned(order_id, assigned_users, order_data=None):
     """Broadcast order_assigned event to all connected clients."""
     channel_layer = get_channel_layer()
+    payload = {
+        'type': 'order_assigned',
+        'order_id': str(order_id),
+        'assigned_users': assigned_users
+    }
+    # Include full order data for realtime update
+    if order_data:
+        payload['order'] = order_data
+
     async_to_sync(channel_layer.group_send)(
         'order_updates',
-        {
-            'type': 'order_assigned',
-            'order_id': str(order_id),
-            'assigned_users': assigned_users
-        }
+        payload
     )

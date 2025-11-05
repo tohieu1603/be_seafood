@@ -420,9 +420,11 @@ class OrderService:
             user=user
         )
 
-        # Broadcast assignment change
+        # Broadcast assignment change with full order
+        from apps.orders.schemas.output_schema import OrderDetailSchema
+        order_data = OrderDetailSchema.from_orm(order).model_dump(mode='json')
         assigned_users_data = [{'id': u.id, 'name': u.get_full_name()} for u in users]
-        broadcast_order_assigned(order.id, assigned_users_data)
+        broadcast_order_assigned(order.id, assigned_users_data, order_data)
 
         return order
 
@@ -465,14 +467,17 @@ class OrderService:
             }
         )
 
-        # Broadcast image uploaded event
+        # Broadcast image uploaded event - send full order for realtime update
+        from apps.orders.schemas.output_schema import OrderDetailSchema
+        order_data = OrderDetailSchema.from_orm(order).model_dump(mode='json')
+
         image_data = {
             'id': image.id,
             'image_url': image.image.url if image.image else None,
             'image_type': image.image_type,
             'uploaded_by': user.get_full_name()
         }
-        broadcast_order_image_uploaded(order.id, image_data)
+        broadcast_order_image_uploaded(order.id, image_data, order_data)
 
         return image
 
