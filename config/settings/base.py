@@ -14,6 +14,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(','
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',  # Must be first for ASGI support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -23,6 +24,7 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'corsheaders',
+    'channels',
 
     # Local apps
     'apps.orders',
@@ -61,6 +63,27 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channels Configuration
+# Option 1: In-Memory (no Redis needed, good for development/single server)
+# NOTE: In-memory doesn't work across multiple server instances
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# Option 2: Redis (for production/multiple servers)
+# Uncomment below and comment out In-Memory if you want to use Redis
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [(config('REDIS_HOST', default='localhost'), config('REDIS_PORT', default=6379, cast=int))],
+#         },
+#     },
+# }
 
 # Database
 DATABASES = {

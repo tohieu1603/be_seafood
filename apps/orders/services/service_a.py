@@ -10,6 +10,14 @@ from apps.orders.schemas.input_schema import CreateOrderSchema, UpdateOrderStatu
 from apps.products.models import Product
 from apps.users.models import User
 from core.enums.base_enum import OrderStatus
+from apps.orders.websocket_utils import (
+    broadcast_order_created,
+    broadcast_order_updated,
+    broadcast_order_deleted,
+    broadcast_order_status_changed,
+    broadcast_order_image_uploaded,
+    broadcast_order_assigned
+)
 
 
 class OrderService:
@@ -129,6 +137,11 @@ class OrderService:
             }
         )
 
+        # Broadcast order created event
+        from apps.orders.schemas.output_schema import OrderDetailSchema
+        order_data = OrderDetailSchema.from_orm(order).dict()
+        broadcast_order_created(order_data)
+
         return order
 
     @transaction.atomic
@@ -173,6 +186,11 @@ class OrderService:
                 'reason': status_data.failure_reason if status_data.failure_reason else None
             }
         )
+
+        # Broadcast order status changed event
+        from apps.orders.schemas.output_schema import OrderDetailSchema
+        order_data = OrderDetailSchema.from_orm(order).model_dump(mode='json')
+        broadcast_order_status_changed(order.id, old_status, status_data.new_status, order_data)
 
         return order
 
@@ -308,6 +326,10 @@ class OrderService:
             user=user
         )
 
+        # Broadcast assignment change
+        assigned_users_data = [{'id': u.id, 'name': u.get_full_name()} for u in users]
+        broadcast_order_assigned(order.id, assigned_users_data)
+
         return order
 
     @transaction.atomic
@@ -348,6 +370,15 @@ class OrderService:
                 'image_id': image.id
             }
         )
+
+        # Broadcast image uploaded event
+        image_data = {
+            'id': image.id,
+            'image_url': image.image.url if image.image else None,
+            'image_type': image.image_type,
+            'uploaded_by': user.get_full_name()
+        }
+        broadcast_order_image_uploaded(order.id, image_data)
 
         return image
 

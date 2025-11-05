@@ -193,6 +193,7 @@ def delete_order_image(request, order_id: int, image_id: int):
     """Delete an order image."""
     try:
         from apps.orders.models import OrderImage
+        from apps.orders.websocket_utils import broadcast_order_image_deleted
 
         image = OrderImage.objects.filter(id=image_id, order_id=order_id).first()
         if not image:
@@ -204,6 +205,10 @@ def delete_order_image(request, order_id: int, image_id: int):
 
         # Delete the database record
         image.delete()
+
+        # Broadcast image deleted event
+        broadcast_order_image_deleted(order_id, image_id)
+
         return 204, None
     except Exception as e:
         return 400, {"detail": str(e)}
@@ -229,11 +234,17 @@ def get_order_activities(request, order_id: int):
 def delete_order(request, order_id: int):
     """Delete an order."""
     try:
+        from apps.orders.websocket_utils import broadcast_order_deleted
+
         order = order_service.get_order_by_id(order_id)
         if not order:
             return 404, {"detail": f"Order with ID {order_id} not found"}
 
         order.delete()
+
+        # Broadcast order deleted event
+        broadcast_order_deleted(order_id)
+
         return 204, None
     except Exception as e:
         return 400, {"detail": str(e)}
