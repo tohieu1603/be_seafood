@@ -1,6 +1,6 @@
 """Permission models for Shield-style RBAC."""
 from django.db import models
-from core.models import BaseModel
+from core.database.base_model import BaseModel
 
 
 class Permission(BaseModel):
