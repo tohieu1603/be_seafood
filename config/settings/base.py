@@ -156,5 +156,12 @@ CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
     default='http://localhost:3000,http://127.0.0.1:3000'
 ).split(',')
+
+# Socket.IO Server URL (for broadcasting realtime events)
+SOCKETIO_SERVER_URL = config(
+    'SOCKETIO_SERVER_URL',
+    default='http://localhost:4000'
+)
+
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'

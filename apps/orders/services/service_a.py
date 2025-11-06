@@ -10,7 +10,7 @@ from apps.orders.schemas.input_schema import CreateOrderSchema, UpdateOrderStatu
 from apps.products.models import Product
 from apps.users.models import User
 from core.enums.base_enum import OrderStatus
-from apps.orders.websocket_utils import (
+from apps.orders.socketio_client import (
     broadcast_order_created,
     broadcast_order_updated,
     broadcast_order_deleted,
