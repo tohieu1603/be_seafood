@@ -38,8 +38,8 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('granted', models.BooleanField(default=True, help_text='True = grant permission, False = revoke permission', verbose_name='Granted')),
-                ('permission', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='user_permissions', to='users.permission', verbose_name='Permission')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='user_permissions', to=settings.AUTH_USER_MODEL, verbose_name='User')),
+                ('permission', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='user_permission_overrides', to='users.permission', verbose_name='Permission')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='custom_permissions', to=settings.AUTH_USER_MODEL, verbose_name='User')),
             ],
             options={
                 'verbose_name': 'User Permission',

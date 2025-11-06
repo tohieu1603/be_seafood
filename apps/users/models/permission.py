@@ -99,13 +99,13 @@ class UserPermission(BaseModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='user_permissions',
+        related_name='custom_permissions',
         verbose_name='User'
     )
     permission = models.ForeignKey(
         Permission,
         on_delete=models.CASCADE,
-        related_name='user_permissions',
+        related_name='user_permission_overrides',
         verbose_name='Permission'
     )
     granted = models.BooleanField(
