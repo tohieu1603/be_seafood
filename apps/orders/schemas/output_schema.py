@@ -79,6 +79,8 @@ class OrderOutSchema(Schema):
     status_changed_at: datetime
     deadline: Optional[datetime]
     delivery_time: Optional[datetime]
+    received_time: Optional[datetime]
+    kitchen_time: Optional[datetime]
     total: Decimal
     assigned_to: List[UserBasicSchema]
     created_at: datetime
@@ -122,6 +124,8 @@ class OrderDetailSchema(Schema):
     status_changed_at: datetime
     deadline: Optional[datetime]
     delivery_time: Optional[datetime]
+    received_time: Optional[datetime]
+    kitchen_time: Optional[datetime]
 
     # Items
     items: List[OrderItemSchema]

@@ -38,6 +38,10 @@ class CreateOrderSchema(BaseModel):
     # Thời gian giao hàng (REQUIRED for display)
     delivery_time: datetime = Field(..., description="Thời gian giao hàng (bắt buộc)")
 
+    # Thời gian nhận hàng và vào bếp
+    received_time: Optional[datetime] = Field(None, description="Thời gian nhận hàng")
+    kitchen_time: Optional[datetime] = Field(None, description="Thời gian vào bếp")
+
     # Phân công nhân viên
     assigned_to_ids: List[int] = Field(default_factory=list)
 
@@ -78,6 +82,10 @@ class UpdateOrderSchema(BaseModel):
 
     # Thời gian giao hàng
     delivery_time: Optional[datetime] = None
+
+    # Thời gian nhận hàng và vào bếp
+    received_time: Optional[datetime] = None
+    kitchen_time: Optional[datetime] = None
 
     # Phân công nhân viên
     assigned_to_ids: Optional[List[int]] = None

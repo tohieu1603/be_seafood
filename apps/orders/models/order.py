@@ -95,6 +95,16 @@ class Order(BaseModel):
         blank=True,
         verbose_name='Thời gian giao hàng'
     )
+    received_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Thời gian nhận hàng'
+    )
+    kitchen_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Thời gian vào bếp'
+    )
 
     # Financial
     subtotal = models.DecimalField(
