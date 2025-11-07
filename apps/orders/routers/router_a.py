@@ -1,6 +1,5 @@
 """Order API router."""
-from typing import Optional
-
+from django.http import HttpResponse
 from ninja import Router, File, UploadedFile, Form, Query
 
 from apps.orders.schemas.input_schema import (
@@ -274,3 +273,209 @@ def delete_order(request, order_id: int):
         return 204, None
     except Exception as e:
         return 400, {"detail": str(e)}
+
+
+@orders_router.get("/{order_id}/export-pdf", url_name="export_pdf")
+def export_order_pdf(request, order_id: int, type: str = "order_bill", size: str = "K80"):
+    """Export order as PDF."""
+    from reportlab.lib.pagesizes import A4, A5
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    import os
+    from django.conf import settings
+
+    try:
+        order = order_service.get_order_by_id(order_id)
+        if not order:
+            return HttpResponse("Order not found", status=404)
+
+        # Create PDF
+        buffer = BytesIO()
+
+        # Set page size
+        if size == "A4":
+            pagesize = A4
+        elif size == "A5":
+            pagesize = A5
+        elif size == "K80":
+            pagesize = (80*mm, 297*mm)
+        else:  # K57
+            pagesize = (57*mm, 297*mm)
+
+        p = canvas.Canvas(buffer, pagesize=pagesize)
+        width, height = pagesize
+
+        # Use Helvetica (built-in font)
+        p.setFont('Helvetica', 10)
+
+        # Draw content
+        y_position = height - 40
+
+        # Header
+        p.setFont('Helvetica-Bold', 14)
+        title = {
+            'order_bill': 'PHIEU DAT HANG',
+            'weighing_receipt': 'PHIEU CAN HANG',
+            'payment_bill': 'HOA DON THANH TOAN',
+            'delivery_note': 'PHIEU GIAO HANG'
+        }.get(type, 'HOA DON')
+
+        p.drawCentredString(width/2, y_position, title)
+        y_position -= 30
+
+        # Order info
+        p.setFont('Helvetica', 10)
+        p.drawString(20, y_position, f"Ma don: {order.order_number}")
+        y_position -= 20
+        p.drawString(20, y_position, f"Khach hang: {order.customer.name}")
+        y_position -= 20
+        p.drawString(20, y_position, f"SDT: {order.customer.phone}")
+        y_position -= 20
+        p.drawString(20, y_position, f"Dia chi: {order.customer.address}")
+        y_position -= 30
+
+        # Items
+        p.setFont('Helvetica-Bold', 10)
+        p.drawString(20, y_position, "San pham:")
+        y_position -= 20
+
+        p.setFont('Helvetica', 9)
+        for item in order.items.all():
+            item_text = f"{item.product.name} - {item.quantity} {item.unit} x {item.price:,.0f}d = {item.total_price:,.0f}d"
+            p.drawString(30, y_position, item_text)
+            y_position -= 15
+
+        y_position -= 10
+
+        # Totals
+        p.setFont('Helvetica', 10)
+        p.drawString(20, y_position, f"Tam tinh: {order.subtotal:,.0f}d")
+        y_position -= 15
+        p.drawString(20, y_position, f"Phi van chuyen: {order.shipping_fee:,.0f}d")
+        y_position -= 15
+        p.drawString(20, y_position, f"Phi chip: {order.chip_fee:,.0f}d")
+        y_position -= 20
+
+        p.setFont('Helvetica-Bold', 12)
+        p.drawString(20, y_position, f"Tong cong: {order.total:,.0f}d")
+
+        p.showPage()
+        p.save()
+
+        buffer.seek(0)
+        response = HttpResponse(buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{order.order_number}_{type}.pdf"'
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f"Error: {str(e)}", status=500)
+
+
+@orders_router.get("/{order_id}/export-word", url_name="export_word")
+def export_order_word(request, order_id: int, type: str = "order_bill", size: str = "A4"):
+    """Export order as Word document."""
+    from docx import Document
+    from docx.shared import Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from io import BytesIO
+
+    try:
+        order = order_service.get_order_by_id(order_id)
+        if not order:
+            return HttpResponse("Order not found", status=404)
+
+        # Create Word document
+        doc = Document()
+
+        # Set page margins for size
+        sections = doc.sections
+        for section in sections:
+            if size == "A5":
+                section.page_height = Inches(8.27)
+                section.page_width = Inches(5.83)
+            # A4 is default
+            section.top_margin = Inches(0.5)
+            section.bottom_margin = Inches(0.5)
+            section.left_margin = Inches(0.5)
+            section.right_margin = Inches(0.5)
+
+        # Title
+        title = {
+            'order_bill': 'PHIẾU ĐẶT HÀNG',
+            'weighing_receipt': 'PHIẾU CÂN HÀNG',
+            'payment_bill': 'HÓA ĐƠN THANH TOÁN',
+            'delivery_note': 'PHIẾU GIAO HÀNG'
+        }.get(type, 'HÓA ĐƠN')
+
+        heading = doc.add_heading(title, 0)
+        heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Order info
+        doc.add_paragraph(f"Mã đơn: {order.order_number}")
+        doc.add_paragraph(f"Khách hàng: {order.customer.name}")
+        doc.add_paragraph(f"Số điện thoại: {order.customer.phone}")
+        doc.add_paragraph(f"Địa chỉ: {order.customer.address}")
+
+        if order.delivery_time:
+            doc.add_paragraph(f"Thời gian giao: {order.delivery_time.strftime('%d/%m/%Y %H:%M')}")
+
+        # Items table
+        doc.add_paragraph()
+        doc.add_heading('Sản phẩm:', level=2)
+
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Light Grid Accent 1'
+
+        # Header row
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'STT'
+        hdr_cells[1].text = 'Sản phẩm'
+        hdr_cells[2].text = 'Số lượng'
+        hdr_cells[3].text = 'Đơn giá'
+        hdr_cells[4].text = 'Thành tiền'
+
+        # Data rows
+        for idx, item in enumerate(order.items.all(), 1):
+            row_cells = table.add_row().cells
+            row_cells[0].text = str(idx)
+            row_cells[1].text = item.product.name
+            row_cells[2].text = f"{item.quantity} {item.unit}"
+            row_cells[3].text = f"{item.price:,.0f}đ"
+            row_cells[4].text = f"{item.total_price:,.0f}đ"
+
+        # Totals
+        doc.add_paragraph()
+        doc.add_paragraph(f"Tạm tính: {order.subtotal:,.0f}đ")
+        doc.add_paragraph(f"Phí vận chuyển: {order.shipping_fee:,.0f}đ")
+        doc.add_paragraph(f"Phí chip: {order.chip_fee:,.0f}đ")
+
+        total_para = doc.add_paragraph()
+        total_para.add_run(f"Tổng cộng: {order.total:,.0f}đ").bold = True
+
+        # Notes
+        if order.notes:
+            doc.add_paragraph()
+            doc.add_heading('Ghi chú:', level=2)
+            doc.add_paragraph(order.notes)
+
+        # Save to buffer
+        buffer = BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.read(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{order.order_number}_{type}.docx"'
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f"Error: {str(e)}", status=500)

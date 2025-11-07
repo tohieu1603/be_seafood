@@ -38,13 +38,47 @@ class OrderRepository:
             )
 
         if filters.date_from:
-            queryset = queryset.filter(created_at__gte=filters.date_from)
+            # Convert to timezone-aware datetime at start of day
+            from django.utils import timezone as tz
+            from datetime import datetime, time
+
+            # If date_from is a string, parse it
+            if isinstance(filters.date_from, str):
+                date_obj = datetime.fromisoformat(filters.date_from.replace('Z', '+00:00'))
+                if date_obj.tzinfo is None:
+                    # Make it timezone-aware at start of day
+                    date_obj = tz.make_aware(datetime.combine(date_obj.date(), time.min))
+                start_date = date_obj
+            else:
+                # Already a datetime object
+                if filters.date_from.tzinfo is None:
+                    start_date = tz.make_aware(datetime.combine(filters.date_from.date(), time.min))
+                else:
+                    start_date = filters.date_from
+
+            queryset = queryset.filter(created_at__gte=start_date)
 
         if filters.date_to:
-            # Include entire day by adding 1 day and using __lt
-            from datetime import timedelta
-            end_date = filters.date_to + timedelta(days=1)
-            queryset = queryset.filter(created_at__lt=end_date)
+            # Include entire day by using end of day (23:59:59)
+            from django.utils import timezone as tz
+            from datetime import datetime, time, timedelta
+
+            # If date_to is a string, parse it
+            if isinstance(filters.date_to, str):
+                date_obj = datetime.fromisoformat(filters.date_to.replace('Z', '+00:00'))
+                if date_obj.tzinfo is None:
+                    # Make it timezone-aware at end of day
+                    date_obj = tz.make_aware(datetime.combine(date_obj.date(), time.max))
+                end_date = date_obj
+            else:
+                # Already a datetime object
+                if filters.date_to.tzinfo is None:
+                    end_date = tz.make_aware(datetime.combine(filters.date_to.date(), time.max))
+                else:
+                    # Add full day
+                    end_date = filters.date_to.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            queryset = queryset.filter(created_at__lte=end_date)
 
         return queryset
 
