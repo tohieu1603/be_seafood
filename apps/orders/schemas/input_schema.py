@@ -137,7 +137,6 @@ class OrderFilterSchema(Schema):
     """Schema for filtering orders."""
 
     status: Optional[str] = Field(None, description="Filter by order status")
-    customer_id: Optional[int] = Field(None, description="Filter by customer ID")
     assigned_to_me: bool = Field(False, description="Show only orders assigned to me")
     search: Optional[str] = Field(None, description="Search by order_name, order_number, customer name, phone")
     date_from: Optional[datetime] = Field(None, description="Filter orders from this date")

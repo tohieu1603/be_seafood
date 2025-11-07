@@ -26,9 +26,6 @@ class OrderRepository:
         if filters.status:
             queryset = queryset.filter(status=filters.status)
 
-        if filters.customer_id:
-            queryset = queryset.filter(customer_id=filters.customer_id)
-
         if filters.assigned_to_me and user_id:
             queryset = queryset.filter(assigned_to__id=user_id)
 
