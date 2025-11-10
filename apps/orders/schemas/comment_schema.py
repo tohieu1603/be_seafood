@@ -63,13 +63,16 @@ class CommentSchema(BaseModel):
     def from_orm(cls, comment):
         """Convert ORM model to schema."""
         from django.conf import settings
+        from urllib.parse import quote
 
         # Build full image URL if image exists
         image_url = None
         if comment.image:
             # Get base URL from settings or use default
             base_url = getattr(settings, 'BASE_URL', 'http://localhost:8000')
-            image_url = f"{base_url}{comment.image.url}"
+            # Properly encode URL for Vietnamese characters and special chars
+            encoded_url = quote(comment.image.url, safe='/:?=&')
+            image_url = f"{base_url}{encoded_url}"
 
         return cls(
             id=comment.id,

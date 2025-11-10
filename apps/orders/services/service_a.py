@@ -1,4 +1,4 @@
-"""Order service with business logic."""
+f"""Order service with business logic."""
 from typing import List, Optional, Tuple
 from datetime import timedelta
 from django.utils import timezone
@@ -469,11 +469,17 @@ class OrderService:
 
         # Broadcast image uploaded event - send full order for realtime update
         from apps.orders.schemas.output_schema import OrderDetailSchema
+        from urllib.parse import quote
         order_data = OrderDetailSchema.from_orm(order).model_dump(mode='json')
+
+        # Properly encode image URL for Vietnamese characters
+        image_url = None
+        if image.image:
+            image_url = quote(image.image.url, safe='/:?=&')
 
         image_data = {
             'id': image.id,
-            'image_url': image.image.url if image.image else None,
+            'image_url': image_url,
             'image_type': image.image_type,
             'uploaded_by': user.get_full_name()
         }

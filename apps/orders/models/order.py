@@ -14,8 +14,8 @@ from apps.users.models import User
 def order_image_upload_path(instance, filename):
     """
     Generate safe upload path for order images.
-    Converts Vietnamese characters to ASCII and adds unique hash.
-    Example: 'Ảnh màn hình.png' -> 'orders/2025/11/10/anh_man_hinh_abc123.png'
+    Converts Vietnamese characters to ASCII and adds timestamp to avoid collisions.
+    Example: 'Ảnh màn hình.png' -> 'orders/2025/11/10/anh-man-hinh-1699612345.png'
     """
     # Get file extension
     ext = os.path.splitext(filename)[1].lower()
@@ -24,13 +24,19 @@ def order_image_upload_path(instance, filename):
     name = os.path.splitext(filename)[0]
 
     # Convert Vietnamese to ASCII and slugify
+    # slugify will convert spaces to hyphens and make it URL-safe
     safe_name = slugify(unidecode(name))
 
-    # Add unique hash to prevent collisions
-    unique_hash = uuid.uuid4().hex[:8]
+    # If slugify results in empty string, use a default
+    if not safe_name:
+        safe_name = "image"
+
+    # Add timestamp to prevent collisions
+    import time
+    timestamp = int(time.time())
 
     # Build final filename
-    final_filename = f"{safe_name}_{unique_hash}{ext}"
+    final_filename = f"{safe_name}-{timestamp}{ext}"
 
     # Return path with date folders
     from datetime import datetime

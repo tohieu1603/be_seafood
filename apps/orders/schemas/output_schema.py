@@ -63,17 +63,12 @@ class OrderImageSchema(Schema):
             return ""
 
         # Get the raw URL from Django's ImageField
+        # Django's ImageField.url already returns the full URL path
         image_url = obj.image.url
 
-        # Split into parts: /media/orders/2025/11/10/filename.png
-        parts = image_url.split('/')
-
-        # Encode each part (especially filename which may have special chars)
-        # Use quote with safe='/' to keep slashes but encode everything else
-        encoded_parts = [quote(part, safe='') for part in parts if part]
-
-        # Rebuild URL with leading slash
-        return '/' + '/'.join(encoded_parts)
+        # Use quote to encode the entire URL, keeping only slashes safe
+        # This will properly encode Vietnamese characters and special chars
+        return quote(image_url, safe='/:?=&')
 
 
 class OrderStatusHistorySchema(Schema):

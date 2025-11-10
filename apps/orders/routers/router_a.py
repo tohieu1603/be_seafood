@@ -208,6 +208,176 @@ def get_order_statistics(request):
         return {"error": str(e)}
 
 
+@orders_router.post("/cleanup-old-images", response={200: dict, 403: ErrorResponse})
+def cleanup_old_images(request, days: int = 30, dry_run: bool = False):
+    """
+    Delete order images older than specified days.
+    Only Admin can execute this.
+    """
+    try:
+        from core.enums.base_enum import UserRole
+        from apps.orders.models import OrderImage
+        from datetime import timedelta
+        from django.utils import timezone
+        import os
+
+        user = request.auth
+
+        # Only admin can cleanup
+        if user.role != UserRole.ADMIN.value:
+            return 403, {"detail": "Chỉ Admin mới có quyền xóa ảnh cũ"}
+
+        # Calculate cutoff date
+        cutoff_date = timezone.now() - timedelta(days=days)
+
+        # Get old images
+        old_images = OrderImage.objects.filter(created_at__lt=cutoff_date)
+        total_count = old_images.count()
+
+        if total_count == 0:
+            return 200, {
+                "success": True,
+                "message": f"Không có ảnh nào cũ hơn {days} ngày",
+                "deleted_count": 0,
+                "total_size_mb": 0,
+                "dry_run": dry_run
+            }
+
+        # Calculate stats
+        total_size = 0
+        deleted_count = 0
+        failed_count = 0
+        deleted_files = []
+
+        for image in old_images:
+            try:
+                file_info = {
+                    "filename": image.image.name if image.image else "N/A",
+                    "order_number": image.order.order_number,
+                    "created_at": image.created_at.isoformat()
+                }
+
+                if image.image and os.path.exists(image.image.path):
+                    file_size = os.path.getsize(image.image.path)
+                    total_size += file_size
+                    file_info["size_kb"] = round(file_size / 1024, 2)
+
+                    if not dry_run:
+                        image.image.delete(save=False)
+                        image.delete()
+                        deleted_count += 1
+                else:
+                    if not dry_run:
+                        image.delete()
+                        deleted_count += 1
+
+                deleted_files.append(file_info)
+
+            except Exception as e:
+                failed_count += 1
+                file_info["error"] = str(e)
+                deleted_files.append(file_info)
+
+        total_size_mb = round(total_size / (1024 * 1024), 2)
+
+        return 200, {
+            "success": True,
+            "message": f"{'Dry run: Sẽ xóa' if dry_run else 'Đã xóa'} {deleted_count} ảnh",
+            "dry_run": dry_run,
+            "days": days,
+            "total_found": total_count,
+            "deleted_count": deleted_count if not dry_run else 0,
+            "would_delete_count": total_count - failed_count if dry_run else 0,
+            "failed_count": failed_count,
+            "total_size_mb": total_size_mb,
+            "files": deleted_files[:50]  # Limit to 50 files in response
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return 400, {"detail": f"Lỗi khi xóa ảnh: {str(e)}"}
+
+
+@orders_router.get("/cleanup-old-images/preview", response={200: dict, 403: ErrorResponse})
+def preview_cleanup_old_images(request, days: int = 30):
+    """
+    Preview what images would be deleted (dry run).
+    Only Admin can access this.
+    """
+    try:
+        from core.enums.base_enum import UserRole
+        from apps.orders.models import OrderImage
+        from datetime import timedelta
+        from django.utils import timezone
+        import os
+
+        user = request.auth
+
+        # Only admin can preview
+        if user.role != UserRole.ADMIN.value:
+            return 403, {"detail": "Chỉ Admin mới có quyền xem thông tin này"}
+
+        # Calculate cutoff date
+        cutoff_date = timezone.now() - timedelta(days=days)
+
+        # Get old images
+        old_images = OrderImage.objects.filter(created_at__lt=cutoff_date).select_related('order')
+        total_count = old_images.count()
+
+        if total_count == 0:
+            return 200, {
+                "success": True,
+                "message": f"Không có ảnh nào cũ hơn {days} ngày",
+                "total_count": 0,
+                "total_size_mb": 0
+            }
+
+        # Calculate stats
+        total_size = 0
+        file_list = []
+
+        for image in old_images[:100]:  # Limit to 100 for preview
+            try:
+                if image.image and os.path.exists(image.image.path):
+                    file_size = os.path.getsize(image.image.path)
+                    total_size += file_size
+
+                    file_list.append({
+                        "id": image.id,
+                        "filename": image.image.name,
+                        "order_number": image.order.order_number,
+                        "image_type": image.image_type,
+                        "created_at": image.created_at.isoformat(),
+                        "size_kb": round(file_size / 1024, 2)
+                    })
+            except Exception:
+                pass
+
+        # Estimate total size for all images
+        if len(file_list) > 0 and total_count > len(file_list):
+            avg_size = total_size / len(file_list)
+            total_size = avg_size * total_count
+
+        total_size_mb = round(total_size / (1024 * 1024), 2)
+
+        return 200, {
+            "success": True,
+            "days": days,
+            "cutoff_date": cutoff_date.isoformat(),
+            "total_count": total_count,
+            "total_size_mb": total_size_mb,
+            "sample_files": file_list,
+            "showing": f"Showing {len(file_list)} of {total_count} files"
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return 400, {"detail": f"Lỗi: {str(e)}"}
+
+
+
 @orders_router.delete("/{order_id}/images/{image_id}", response={204: None, 404: ErrorResponse})
 def delete_order_image(request, order_id: int, image_id: int):
     """Delete an order image."""
