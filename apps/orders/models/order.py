@@ -1,10 +1,41 @@
 """Order models."""
+import os
+import uuid
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
+from unidecode import unidecode
 from core.database.base_model import BaseModel
 from core.enums.base_enum import OrderStatus
 from apps.products.models import Product
 from apps.users.models import User
+
+
+def order_image_upload_path(instance, filename):
+    """
+    Generate safe upload path for order images.
+    Converts Vietnamese characters to ASCII and adds unique hash.
+    Example: 'Ảnh màn hình.png' -> 'orders/2025/11/10/anh_man_hinh_abc123.png'
+    """
+    # Get file extension
+    ext = os.path.splitext(filename)[1].lower()
+
+    # Remove extension from filename
+    name = os.path.splitext(filename)[0]
+
+    # Convert Vietnamese to ASCII and slugify
+    safe_name = slugify(unidecode(name))
+
+    # Add unique hash to prevent collisions
+    unique_hash = uuid.uuid4().hex[:8]
+
+    # Build final filename
+    final_filename = f"{safe_name}_{unique_hash}{ext}"
+
+    # Return path with date folders
+    from datetime import datetime
+    now = datetime.now()
+    return f"orders/{now.year}/{now.month:02d}/{now.day:02d}/{final_filename}"
 
 
 def generate_order_number():
@@ -283,7 +314,7 @@ class OrderImage(BaseModel):
         verbose_name='Đơn hàng'
     )
     image = models.ImageField(
-        upload_to='orders/%Y/%m/%d/',
+        upload_to=order_image_upload_path,
         verbose_name='Hình ảnh'
     )
     image_type = models.CharField(

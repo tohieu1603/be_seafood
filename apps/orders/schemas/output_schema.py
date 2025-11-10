@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel
 from ninja import Schema
+from urllib.parse import quote
 
 
 class UserBasicSchema(Schema):
