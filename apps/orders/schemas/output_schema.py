@@ -56,6 +56,25 @@ class OrderImageSchema(Schema):
     uploaded_by: Optional[UserBasicSchema] = None
     created_at: datetime
 
+    @staticmethod
+    def resolve_image(obj):
+        """Return properly encoded image URL."""
+        if not obj.image:
+            return ""
+
+        # Get the raw URL from Django's ImageField
+        image_url = obj.image.url
+
+        # Split into parts: /media/orders/2025/11/10/filename.png
+        parts = image_url.split('/')
+
+        # Encode each part (especially filename which may have special chars)
+        # Use quote with safe='/' to keep slashes but encode everything else
+        encoded_parts = [quote(part, safe='') for part in parts if part]
+
+        # Rebuild URL with leading slash
+        return '/' + '/'.join(encoded_parts)
+
 
 class OrderStatusHistorySchema(Schema):
     """Order status history schema."""
